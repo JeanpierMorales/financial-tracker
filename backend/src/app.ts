@@ -1,0 +1,92 @@
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
+
+import { prisma } from "./config/prisma.js";
+
+import { healthRoutes } from "./routes/health.routes.js";
+import { authRoutes } from "./routes/auth.routes.js";
+import { categoryRoutes } from "./routes/category.routes.js";
+import { movementRoutes } from "./routes/movement.routes.js";
+import { budgetRoutes } from "./routes/budget.routes.js";
+
+import { dashboardRoutes } from "./routes/dashboard.routes.js";
+const app = Fastify({
+  logger: true,
+});
+
+await app.register(cors, {
+  origin: true,
+});
+
+await app.register(swagger, {
+  openapi: {
+    info: {
+      title: "Financial Tracker API",
+      description: "API para la gestión de finanzas personales",
+      version: "1.0.0",
+    },
+
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
+
+    tags: [
+      {
+        name: "Health",
+        description: "API health checks",
+      },
+      {
+        name: "Auth",
+        description: "Authentication endpoints",
+      },
+      {
+        name: "Categories",
+        description: "Expense categories",
+      },
+      {
+        name: "Movements",
+        description: "Income and expense movements",
+      },
+      {
+        name: "Budgets",
+        description: "Financial budgets",
+      },
+      {
+        name: "Dashboard",
+        description: "Financial dashboard",
+      },
+    ],
+  },
+});
+
+await app.register(swaggerUi, {
+  routePrefix: "/docs",
+});
+
+await app.register(healthRoutes);
+await app.register(authRoutes);
+await app.register(categoryRoutes);
+await app.register(movementRoutes);
+await app.register(budgetRoutes);
+await app.register(dashboardRoutes);
+
+const PORT = Number(process.env.PORT) || 3000;
+
+try {
+  await app.listen({
+    port: PORT,
+    host: "0.0.0.0",
+  });
+} catch (error) {
+  app.log.error(error);
+  await prisma.$disconnect();
+  process.exit(1);
+}
