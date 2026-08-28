@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 
-import { prisma } from "./config/prisma.js";
+import "./types/fastify.js";
 
 import { healthRoutes } from "./routes/health.routes.js";
 import { authRoutes } from "./routes/auth.routes.js";
@@ -27,11 +27,11 @@ if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   throw new Error("CORS_ORIGIN is required in production");
 }
 
-await app.register(cors, {
+app.register(cors, {
   origin: allowedOrigins.length > 0 ? allowedOrigins : true,
 });
 
-await app.register(swagger, {
+app.register(swagger, {
   openapi: {
     info: {
       title: "Financial Tracker API",
@@ -86,28 +86,22 @@ await app.register(swagger, {
   },
 });
 
-await app.register(swaggerUi, {
+app.register(swaggerUi, {
   routePrefix: "/docs",
 });
 
-await app.register(healthRoutes);
-await app.register(authRoutes);
-await app.register(categoryRoutes);
-await app.register(accountRoutes);
-await app.register(movementRoutes);
-await app.register(budgetRoutes);
-await app.register(savingsGoalRoutes);
-await app.register(dashboardRoutes);
+app.register(healthRoutes);
+app.register(authRoutes);
+app.register(categoryRoutes);
+app.register(accountRoutes);
+app.register(movementRoutes);
+app.register(budgetRoutes);
+app.register(savingsGoalRoutes);
+app.register(dashboardRoutes);
 
 const PORT = Number(process.env.PORT) || 3000;
 
-try {
-  await app.listen({
-    port: PORT,
-    host: "0.0.0.0",
-  });
-} catch (error) {
-  app.log.error(error);
-  await prisma.$disconnect();
-  process.exit(1);
-}
+app.listen({
+  port: PORT,
+  host: "0.0.0.0",
+});

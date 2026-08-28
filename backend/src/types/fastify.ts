@@ -5,3 +5,5 @@ declare module "fastify" {
     user: User;
   }
 }
+
+export {};
