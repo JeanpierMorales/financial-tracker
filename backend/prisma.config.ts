@@ -1,10 +1,11 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { parsePostgresUrl } from "./src/utils/database-url.js";
 
 const directUrl = process.env["DIRECT_URL"];
 if (!directUrl) throw new Error("DIRECT_URL is not defined");
-const secureDirectUrl = new URL(directUrl);
-if (!secureDirectUrl.searchParams.has("sslmode")) secureDirectUrl.searchParams.set("sslmode", "require");
+const secureDirectUrl = parsePostgresUrl(directUrl);
+secureDirectUrl.searchParams.set("sslmode", "require");
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

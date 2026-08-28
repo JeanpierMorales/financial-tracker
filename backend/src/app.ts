@@ -10,14 +10,25 @@ import { authRoutes } from "./routes/auth.routes.js";
 import { categoryRoutes } from "./routes/category.routes.js";
 import { movementRoutes } from "./routes/movement.routes.js";
 import { budgetRoutes } from "./routes/budget.routes.js";
+import { accountRoutes } from "./routes/account.routes.js";
+import { savingsGoalRoutes } from "./routes/savings-goal.routes.js";
 
 import { dashboardRoutes } from "./routes/dashboard.routes.js";
 const app = Fastify({
   logger: true,
 });
 
+const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
+  throw new Error("CORS_ORIGIN is required in production");
+}
+
 await app.register(cors, {
-  origin: true,
+  origin: allowedOrigins.length > 0 ? allowedOrigins : true,
 });
 
 await app.register(swagger, {
@@ -56,12 +67,20 @@ await app.register(swagger, {
         description: "Income and expense movements",
       },
       {
+        name: "Accounts",
+        description: "Cash, bank, wallet, savings, and investment accounts",
+      },
+      {
         name: "Budgets",
         description: "Financial budgets",
       },
       {
         name: "Dashboard",
         description: "Financial dashboard",
+      },
+      {
+        name: "Savings goals",
+        description: "Personal savings goals",
       },
     ],
   },
@@ -74,8 +93,10 @@ await app.register(swaggerUi, {
 await app.register(healthRoutes);
 await app.register(authRoutes);
 await app.register(categoryRoutes);
+await app.register(accountRoutes);
 await app.register(movementRoutes);
 await app.register(budgetRoutes);
+await app.register(savingsGoalRoutes);
 await app.register(dashboardRoutes);
 
 const PORT = Number(process.env.PORT) || 3000;

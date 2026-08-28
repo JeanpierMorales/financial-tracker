@@ -1,3 +1,4 @@
+import type { Budget, Category } from "@prisma/client";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
@@ -6,7 +7,8 @@ import { authenticate } from "../middleware/auth.js";
 import { getOrCreateUser } from "../utils/user.js";
 
 const budgetSchema = z.object({
-  amount: z.number().positive(),
+  amount: z.number().finite().positive().max(999_999_999_999.99),
+  categoryId: z.string().uuid(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
 });
@@ -18,6 +20,46 @@ const security = [
     bearerAuth: [],
   },
 ];
+
+const categoryIsAvailable = (userId: string, categoryId: string) =>
+  prisma.category.findFirst({
+    where: {
+      id: categoryId,
+      isActive: true,
+      OR: [{ userId: null }, { userId }],
+    },
+  });
+
+const enrichBudget = async (
+  userId: string,
+  budget: Budget & { category: Category },
+) => {
+  const inclusiveEnd = new Date(budget.endDate);
+  inclusiveEnd.setUTCHours(23, 59, 59, 999);
+
+  const expenses = await prisma.movement.aggregate({
+    where: {
+      userId,
+      categoryId: budget.categoryId,
+      type: "EXPENSE",
+      date: {
+        gte: budget.startDate,
+        lte: inclusiveEnd,
+      },
+    },
+    _sum: { amount: true },
+  });
+  const amount = Number(budget.amount);
+  const spent = Number(expenses._sum.amount ?? 0);
+
+  return {
+    ...budget,
+    amount,
+    spent,
+    remaining: amount - spent,
+    percentage: amount > 0 ? (spent / amount) * 100 : 0,
+  };
+};
 
 export async function budgetRoutes(app: FastifyInstance) {
   // CREATE
@@ -51,16 +93,37 @@ export async function budgetRoutes(app: FastifyInstance) {
 
       const user = await getOrCreateUser(request.user);
 
+      if (!(await categoryIsAvailable(user.id, data.categoryId))) {
+        return reply.status(400).send({ error: "Category is not available" });
+      }
+
+      const overlapping = await prisma.budget.findFirst({
+        where: {
+          userId: user.id,
+          categoryId: data.categoryId,
+          startDate: { lte: data.endDate },
+          endDate: { gte: data.startDate },
+        },
+      });
+
+      if (overlapping) {
+        return reply.status(409).send({
+          error: "A budget for this category already overlaps the selected dates",
+        });
+      }
+
       const budget = await prisma.budget.create({
         data: {
           userId: user.id,
+          categoryId: data.categoryId,
           amount: data.amount,
           startDate: data.startDate,
           endDate: data.endDate,
         },
+        include: { category: true },
       });
 
-      return reply.status(201).send(budget);
+      return reply.status(201).send(await enrichBudget(user.id, budget));
     },
   );
 
@@ -85,9 +148,12 @@ export async function budgetRoutes(app: FastifyInstance) {
         orderBy: {
           startDate: "desc",
         },
+        include: { category: true },
       });
 
-      return reply.send(budgets);
+      return reply.send(
+        await Promise.all(budgets.map((budget) => enrichBudget(user.id, budget))),
+      );
     },
   );
 
@@ -114,6 +180,7 @@ export async function budgetRoutes(app: FastifyInstance) {
           id,
           userId: user.id,
         },
+        include: { category: true },
       });
 
       if (!budget) {
@@ -122,7 +189,7 @@ export async function budgetRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.send(budget);
+      return reply.send(await enrichBudget(user.id, budget));
     },
   );
 
@@ -170,10 +237,31 @@ export async function budgetRoutes(app: FastifyInstance) {
 
       const startDate = data.startDate ?? existing.startDate;
       const endDate = data.endDate ?? existing.endDate;
+      const categoryId = data.categoryId ?? existing.categoryId;
 
       if (endDate < startDate) {
         return reply.status(400).send({
           error: "End date must be after start date",
+        });
+      }
+
+      if (!(await categoryIsAvailable(user.id, categoryId))) {
+        return reply.status(400).send({ error: "Category is not available" });
+      }
+
+      const overlapping = await prisma.budget.findFirst({
+        where: {
+          id: { not: id },
+          userId: user.id,
+          categoryId,
+          startDate: { lte: endDate },
+          endDate: { gte: startDate },
+        },
+      });
+
+      if (overlapping) {
+        return reply.status(409).send({
+          error: "A budget for this category already overlaps the selected dates",
         });
       }
 
@@ -185,6 +273,7 @@ export async function budgetRoutes(app: FastifyInstance) {
           ...(data.amount !== undefined && {
             amount: data.amount,
           }),
+          ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
 
           ...(data.startDate !== undefined && {
             startDate: data.startDate,
@@ -194,9 +283,10 @@ export async function budgetRoutes(app: FastifyInstance) {
             endDate: data.endDate,
           }),
         },
+        include: { category: true },
       });
 
-      return reply.send(budget);
+      return reply.send(await enrichBudget(user.id, budget));
     },
   );
 

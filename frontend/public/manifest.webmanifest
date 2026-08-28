@@ -1,0 +1,22 @@
+{
+  "name": "Norte · Finanzas personales",
+  "short_name": "Norte",
+  "description": "Registra ingresos, gastos, transferencias y presupuestos desde cualquier dispositivo.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9fc",
+  "theme_color": "#7257f5",
+  "orientation": "any",
+  "lang": "es-PE",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

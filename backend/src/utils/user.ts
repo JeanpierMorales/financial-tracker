@@ -11,6 +11,23 @@ export async function getOrCreateUser(
     update: {},
     create: {
       authUserId: supabaseUser.id,
+      accounts: {
+        create: [
+          {
+            name: "Efectivo",
+            type: "CASH",
+          },
+          {
+            name: "Yape",
+            type: "WALLET",
+            institution: "Yape",
+          },
+          {
+            name: "Cuenta bancaria",
+            type: "BANK",
+          },
+        ],
+      },
     },
   });
 }
